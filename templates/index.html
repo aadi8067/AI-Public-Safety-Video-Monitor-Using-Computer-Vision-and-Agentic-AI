@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time-object-detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"> 
+</head>
+<body>
+    <nav>
+    <div class="nav-logo">
+        <img src="{{ url_for('static', filename='assets/yolo_logo3.png') }}" alt="YOLO Logo" style="height:70px;">
+    </div>
+    <ul>
+    <li><a href="#hero">Home</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#faq-section">FAQ</a></li>
+    <li><a href="#contact-section">Contact Us</a></li>
+ 
+    </ul>
+
+</nav>
+
+
+    <section class="hero-section" id="hero">
+  <div class="hero-placeholder-box">
+    <img src="{{ url_for('static', filename='assets/heroimage.png') }}" alt="AI Recognition Demo Image" class="hero-image">
+    <div class="hero-overlay-content">
+      <h1>Real-time-object-detection 🔍✨</h1>
+      <p>
+        Experience real-time object detection powered by YOLO. 
+        Detect people, vehicles, and everyday objects instantly through your camera roll
+        – all in your browser with complete privacy.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+    <section class="feature-cards-section">
+        <div class="feature-card">
+            <h3>100% Private</h3>
+            <p>All processing happens locally in your browser</p>
+        </div>
+        <div class="feature-card">
+            <h3>Upload & Detection</h3>
+            <p>Instant image upload with fast YOLO object detection</p>
+        </div>
+        <div class="feature-card">
+            <h3>Annotated Output</h3>
+            <p>Bounding boxes and labels displayed directly on detected objects</p>
+        </div>
+        <div class="feature-card">
+            <h3>Free to Use</h3>
+            <p>No registration or subscription required</p>
+        </div>
+    </section>
+
+    <main>
+        <div class="container studio-container" id="studio-section">
+            <h2>YOLO Object Detection</h2>
+            
+            <div class="detection-studio-layout">
+                <div class="controls-panel">
+                    <h3>Image Recognition Controls</h3>
+                    <form id="uploadForm" class="upload-form">
+                        <p style="font-size:0.9rem; color:#555; margin-bottom:5px;">
+                           Set your desired confidence threshold before uploading the image.
+                        </p>
+                        <label for="confidenceSlider" style="margin-top:10px; display:block;">Confidence Threshold: 
+                        <span id="confidenceValue">0.2</span> </label>
+
+                        <input type="range" id="confidenceSlider" name="confidence" min="0" max="1" step="0.05" value="0.2">
+
+                        <label for="imageInput" class="upload-label" id="uploadLabel">Choose an image</label>
+                        <input type="file" name="image" id="imageInput" accept="image/*" required>
+                        <span id="fileNameDisplay" style="margin-left:10px; font-size:0.9rem; color:#555;"></span>
+                        <button type="submit" id="detectButton">Detect Objects</button>
+                        
+                    </form>
+                </div>
+                
+
+                <div class="results-panel">
+                    <h3>Results 📋</h3>
+                    <div class="result-box-wrapper">
+                        <pre id="resultBox" class="placeholder">Upload an image and start recognition to see your analysis results here.</pre>
+                    </div>
+                    <h4>Annotated Image:</h4>
+                    <img id="annotatedImage" src="" alt="Annotated Image" style="display:none;">
+                </div>
+            </div>
+            <div id="staticResults">
+    <p style="text-align:center;">Start webcam to begin live detection.</p>
+</div>
+
+<div id="liveResults" style="display:none;">
+    <img id="liveStream" src="" alt="Live Stream" style="width:100%; border-radius:10px;">
+</div>
+
+<button id="liveToggleButton" style="
+    margin-top:10px;
+    padding:10px 20px;
+    background-color:#32dde6;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    display:block;
+    margin-left:auto;
+    margin-right:auto;
+">
+    🎥 Start Live Detection
+</button>
+        </div>
+
+
+        <div class="about-section" id="about">
+            <h1>About YOLO Object Detection</h1>
+            <p>
+                This Website demonstrates real-time object detection using the YOLO (You Only Live Once) algorithm. 
+                We built this with modern tools to deliver accurate and fast detection in real-world applications.
+            </p>
+
+            <h3>Tools Used</h3>
+            <ul>
+                <li>YOLOv8</li>
+                <li>Flask (Backend Framework)</li>
+                <li>HTML, CSS (Frontend)</li>
+            </ul>
+
+            <h3>Key Features</h3>
+            <ul>
+                <li>Real-time image upload and object detection</li>
+                <li>Annotated output with bounding boxes</li>
+                <li>JSON results for easy integration</li>
+                <li>Lightweight Flask backend for fast deployment</li>
+                <li>User-friendly frontend interface</li>
+            </ul>
+
+            <h3>Meet Our Team</h3>
+            <div class="team">
+                <div class="member-card">
+                    <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Vaibhav Mhetre">
+                    <h4>Vaibhav Mhetre</h4>
+                    <p>Project Manager</p>
+                </div>
+                <div class="member-card">
+                    <img src="https://www.w3schools.com/howto/img_avatar2.png" alt="Arya Shah">
+                    <h4>Arya Shah</h4>
+                    <p>Backend Developer</p>
+                </div>
+                <div class="member-card">
+                    <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Aditya Dhakane">
+                    <h4>Aditya Dhakane</h4>
+                    <p>Backend Developer</p>
+                </div>
+                <div class="member-card">
+                    <img src="https://www.w3schools.com/howto/img_avatar2.png" alt="Siony Chaudhari">
+                    <h4>Siony Chaudhari</h4>
+                    <p>Frontend Developer</p>
+                </div>
+                <div class="member-card">
+                    <img src="https://www.w3schools.com/howto/img_avatar2.png" alt="Shreya Anjikhane">
+                    <h4>Shreya Anjikhane</h4>
+                    <p>Frontend Developer</p>
+                </div>
+            </div>
+        </div>
+
+         <section class="faq-section" id="faq-section">
+  <h2>Frequently Asked Questions</h2>
+
+  <div class="faq-item">
+    <button class="faq-question">
+      What is YOLO real-time object detection?
+      <span class="arrow">&#9654;</span>
+    </button>
+    <div class="faq-answer">
+      <p>YOLO (You Only Look Once) is an AI model that detects objects in images or video streams in real-time with high accuracy.</p>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question">
+      Do I need to upload my data?
+      <span class="arrow">&#9654;</span>
+    </button>
+    <div class="faq-answer">
+      <p>No. You can process your images directly in the browser or through our backend. Your data stays secure.</p>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question">
+      Can I export results?
+      <span class="arrow">&#9654;</span>
+    </button>
+    <div class="faq-answer">
+      <p>Yes. The detections can be downloaded as annotated images or JSON files for easy integration into your projects.</p>
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-question">
+      Which models are supported?
+      <span class="arrow">&#9654;</span>
+    </button>
+    <div class="faq-answer">
+      <p>Currently, YOLOv8 is supported, but we plan to add more models soon.</p>
+    </div>
+  </div>
+</section>
+
+    </main>
+
+    <footer>
+        <section class="contact-section" id="contact-section">
+    <div style="max-width:1200px; margin:auto; text-align:center; line-height:1.8;">
+        <p style="font-size:1.2rem; margin-bottom:1rem; font-weight:600;">CONTACT US</p>
+
+        <!-- Top row: Email & Phone -->
+        <div style="margin-bottom:15px;">
+    <span style="margin-right:30px;">
+        <i class="fas fa-envelope"></i> Email: 
+        <a href="mailto:sionychaudhari2006@gmail.com" style="color:#32dde6; text-decoration:none;">sionychaudhari2006@gmail.com</a>
+    </span>
+    <span>
+        <i class="fas fa-phone phone-icon"></i> Phone: 
+        <a href="tel:+911234567890" style="color:#32dde6; text-decoration:none;">+91 12345 67890</a>
+    </span>
+    
+</div>
+      <div style="margin-bottom:15px;">
+       <span style="margin-right:30px; color:white;">
+    <i class="fas fa-map-marker-alt"></i> Address: 
+    <span style="color:#32dde6;">666, Upper Indira Nagar, Bibwewadi, Pune, Maharashtra, India - 411037</span>
+</span></div>
+        <!-- Bottom row: GitHub, Demo, Email -->
+        <div style="margin-bottom:15px;">
+            <a href="https://github.com/AryaShah07/Real_time_object_detection_yolo" target="_blank" style="color:#32dde6; text-decoration:none; margin:0 10px;">GitHub Repo</a> |
+            <!-- <a href="https://youtu.be/YourDemoVideoLink" target="_blank" style="color:#32dde6; text-decoration:none; margin:0 10px;">Demo Video</a> | -->
+            <a href="{{ url_for('contact') }}" style="color:#32dde6; text-decoration:none; margin:0 10px;">Need Help?</a>
+        </div>
+
+        <p style="font-size:0.85rem; color:#b3b0b0; margin-top:1rem;">
+            © 2025 Team Samfocus — YOLO Object Detection Project
+        </p>
+    </div>
+</section>
+
+    </footer>
+
+<script>
+const navLinks = document.querySelectorAll('nav ul li a');
+const sections = document.querySelectorAll('section');
+const navbarHeight = 80;
+
+let clickedLink = null; // Track the clicked link
+
+function setActiveLink() {
+  if (clickedLink) return; // Keep the clicked link highlighted
+
+  let scrollPos = window.scrollY + navbarHeight + 50;
+
+  sections.forEach(section => {
+    const id = section.getAttribute('id');
+    if (!id) return;
+    const link = document.querySelector(`nav ul li a[href="#${id}"]`);
+    if (!link) return;
+
+    const sectionTop = section.offsetTop;
+    const sectionBottom = sectionTop + section.offsetHeight - 120;
+
+    if (scrollPos >= sectionTop && scrollPos < sectionBottom) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+    }
+  });
+
+  // Remove highlight only if at the absolute bottom of page
+  if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 5) {
+    navLinks.forEach(l => l.classList.remove('active'));
+  }
+}
+
+// Smooth scroll with offset and click highlight
+navLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    const href = link.getAttribute('href');
+    if (!href.startsWith('#')) return;
+
+    e.preventDefault();
+    const target = document.querySelector(href);
+    if (!target) return;
+
+    const targetPos = target.offsetTop - navbarHeight + 5;
+    window.scrollTo({ top: targetPos, behavior: 'smooth' });
+
+    // Remove active from all links and highlight clicked one
+    navLinks.forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    clickedLink = link; // Keep clicked link highlighted
+  });
+});
+
+// Optional: reset clickedLink after scrolling
+window.addEventListener('scroll', () => {
+  setActiveLink();
+});
+
+window.addEventListener('load', setActiveLink);
+</script>
+
+
+
+
+
+<script>
+    const uploadForm = document.getElementById('uploadForm');
+    const imageInput = document.getElementById('imageInput');
+    const resultBox = document.getElementById('resultBox');
+    const annotatedImage = document.getElementById('annotatedImage');
+    const uploadLabel = document.getElementById('uploadLabel');
+
+imageInput.addEventListener('change', () => {
+    const file = imageInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Replace label text with image preview
+            uploadLabel.innerHTML = `<img src="${e.target.result}" alt="Selected Image" style="max-width:100%; max-height:150px; object-fit:contain; border-radius:8px;">`;
+        }
+        reader.readAsDataURL(file);
+    } else {
+        // Reset label if no file selected
+        uploadLabel.textContent = "Choose an image";
+    }
+});
+
+
+    
+
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const file = imageInput.files[0];
+        if (!file) {
+            alert("Please select an image first!");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        
+        const confidence = confidenceSlider.value;
+        formData.append('confidence', confidence);
+
+        resultBox.textContent = "Processing image... 🔄";
+        annotatedImage.style.display = 'none';
+        
+        confidenceSlider.disabled = true;
+
+        try {
+            const response = await fetch('/detect', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error("Server returned an error");
+
+            const data = await response.json();
+
+            if (data.error) {
+                resultBox.textContent = "Error: " + data.error;
+                if (data.filename) {
+                  window.lastUploadedFilename = data.filename;
+                }
+
+                annotatedImage.style.display = 'none';
+                return;
+            }
+
+            
+              // Load results.html dynamically inside the results panel
+                const resultsPanel = document.querySelector('.results-panel');
+                const htmlResponse = await fetch('/results.html');
+                const htmlText = await htmlResponse.text();
+                resultsPanel.innerHTML = htmlText;
+
+                // Populate annotated image
+                //const annotatedImg = document.getElementById('annotatedImage');
+                //annotatedImg.src = data.annotated_image;
+                //annotatedImg.style.display = 'block'; 
+                
+                const annotatedImg = document.getElementById('annotatedImage');
+                annotatedImg.src = data.annotated_image + '?t=' + new Date().getTime();
+                annotatedImg.style.display = 'block';
+
+
+                // Populate detected object list with styled cards
+                if (data.detections && data.detections.length > 0) {
+                  const detailsDiv = document.getElementById('detectionDetails');
+                  const objectList = document.getElementById('objectList');
+                  detailsDiv.style.display = 'block';
+                  objectList.innerHTML = '';
+
+                  data.detections.forEach(det => {
+                    const li = document.createElement('li');
+                    const confidencePercent = (det.confidence * 100).toFixed(1);
+
+                    li.innerHTML = `
+                      <div class="object-card">
+                        <div class="object-header">
+                          <span class="object-class">${det.class.toUpperCase()}</span>
+                          <span class="object-confidence">${confidencePercent}%</span>
+                        </div>
+                        <div class="confidence-bar">
+                          <div class="confidence-fill" style="width:${confidencePercent}%;"></div>
+                        </div>
+                      </div>
+                    `;
+                    objectList.appendChild(li);
+                  });
+                } else {
+                  const detailsDiv = document.getElementById('detectionDetails');
+                  detailsDiv.style.display = 'block';
+                  document.getElementById('objectList').innerHTML = `
+                    <li><div class="object-card"><span class="object-class">No objects detected</span></div></li>`;
+                }       
+
+           if (data.csv_url) {
+    const oldBtn = document.querySelector('.download-btn');
+    if (oldBtn) oldBtn.remove();
+
+    const downloadBtn = document.createElement('a');
+    downloadBtn.href = data.csv_url;
+    downloadBtn.download = 'predictions.csv';
+    downloadBtn.textContent = 'Download Result';
+    downloadBtn.className = 'download-btn';
+
+    // Add button-like styling
+    downloadBtn.style.display = 'inline-block';
+    downloadBtn.style.marginTop = '10px';
+    downloadBtn.style.padding = '10px 20px';
+    downloadBtn.style.backgroundColor = '#32dde6';
+    downloadBtn.style.color = '#fff';
+    downloadBtn.style.borderRadius = '8px';
+    downloadBtn.style.textDecoration = 'none';
+    downloadBtn.style.fontWeight = '500';
+    downloadBtn.style.transition = 'background 0.3s ease';
+    
+    // Optional hover effect
+    downloadBtn.addEventListener('mouseenter', () => {
+        downloadBtn.style.backgroundColor = '#28b8c7';
+    });
+    downloadBtn.addEventListener('mouseleave', () => {
+        downloadBtn.style.backgroundColor = '#32dde6';
+    });
+
+    resultsPanel.appendChild(downloadBtn);
+}
+
+
+            // Setup "Try Another Image" button
+                const backBtn = document.getElementById('backBtn');
+                backBtn.addEventListener('click', () => {
+    // Reset results panel
+    resultsPanel.innerHTML = `
+        <h3>Results 📋</h3>
+        <div class="result-box-wrapper">
+            <pre id="resultBox" class="placeholder">Upload an image and start recognition to see your analysis results here.</pre>
+        </div>
+        <h4>Annotated Image:</h4>
+        <img id="annotatedImage" src="" alt="Annotated Image" style="display:none;">
+    `;
+
+    // Reset the form
+    uploadForm.reset();
+    document.getElementById('resultBox').textContent = "Ready for new detection 🔍";
+    document.getElementById('imageInput').value = "";
+
+    // Reset the placeholder label
+    uploadLabel.textContent = "Choose an image";
+});
+
+
+        } catch (err) {
+            resultBox.textContent = "Error: " + err.message;
+            annotatedImage.style.display = 'none';
+        }
+    });
+</script>
+
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const faqItems = document.querySelectorAll('.faq-item');
+
+  faqItems.forEach(item => {
+    const question = item.querySelector('.faq-question');
+    const arrow = question.querySelector('.arrow');
+
+    question.addEventListener('click', () => {
+      const isActive = item.classList.contains('active');
+
+      // Close all others
+      faqItems.forEach(i => {
+        i.classList.remove('active');
+        const a = i.querySelector('.arrow');
+        if (a) a.classList.remove('rotate');
+      });
+
+      // Toggle current
+      if (!isActive) {
+        item.classList.add('active');
+        if (arrow) arrow.classList.add('rotate');
+      }
+    });
+  });
+});
+</script>
+
+<script>
+const confidenceSlider = document.getElementById('confidenceSlider');
+const confidenceValue = document.getElementById('confidenceValue');
+
+confidenceSlider.addEventListener('input', () => {
+    confidenceValue.textContent = confidenceSlider.value;
+});
+</script>
+
+<script>
+  const liveBtn = document.getElementById('liveToggleButton');
+const liveStream = document.getElementById('liveStream');
+const liveResults = document.getElementById('liveResults');
+const staticResults = document.getElementById('staticResults');
+let liveActive = false;
+
+liveBtn.addEventListener('click', () => {
+    if (!liveActive) {
+        staticResults.style.display = "none";
+        liveResults.style.display = "block";
+        liveStream.src = "/live";  // Starts MJPEG stream
+        liveBtn.textContent = "⏹ Stop Live Detection";
+        liveBtn.style.background = "#ff4b5c";
+        liveActive = true;
+    } else {
+        liveStream.src = "";        // Stops stream
+        staticResults.style.display = "block";
+        liveResults.style.display = "none";
+        liveBtn.textContent = "🎥 Start Live Detection";
+        liveBtn.style.background = "#32dde6";
+        liveActive = false;
+    }
+});
+
+</script>
+
+<script>
+  navLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    const href = link.getAttribute('href');
+    
+    if (href.startsWith("#")) {
+      // Internal scroll
+      e.preventDefault();
+      const target = document.querySelector(href);
+      if (!target) return;
+      const targetPos = target.offsetTop - navbarHeight;
+      window.scrollTo({ top: targetPos, behavior: 'smooth' });
+    }
+    // External links (like /contact) will navigate normally
+  });
+});
+</script>
+
+
+
+</body>
+
+</html>
+
+
