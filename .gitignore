@@ -71,3 +71,5 @@ streamlit_app.py
 
 # Dataset archive
 weapons.yolov8.zip
+
+tuning_results/
