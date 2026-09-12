@@ -116,6 +116,38 @@
 </button>
         </div>
 
+        <div class="container studio-container" id="video-section">
+        <h2>Video Detection &amp; Tracking</h2>
+
+        <div class="detection-studio-layout">
+            <div class="controls-panel">
+                <h3>Video Recognition Controls</h3>
+                <form id="videoUploadForm" class="upload-form">
+                    <p style="font-size:0.9rem; color:#555; margin-bottom:5px;">
+                        Upload a video. Each detected person/object gets a persistent ID across frames.
+                    </p>
+                    <label for="videoConfidenceSlider" style="margin-top:10px; display:block;">
+                        Confidence Threshold: <span id="videoConfidenceValue">0.3</span>
+                    </label>
+                    <input type="range" id="videoConfidenceSlider" name="confidence" min="0" max="1" step="0.05" value="0.3">
+
+                    <label for="videoInput" class="upload-label" id="videoUploadLabel">Choose a video</label>
+                    <input type="file" name="video" id="videoInput" accept="video/*" required>
+                    <span id="videoFileNameDisplay" style="margin-left:10px; font-size:0.9rem; color:#555;"></span>
+                    <button type="submit" id="detectVideoButton">Process Video</button>
+                </form>
+            </div>
+
+            <div class="results-panel">
+                <h3>Tracking Results 📋</h3>
+                <div class="result-box-wrapper">
+                    <pre id="videoResultBox" class="placeholder">Upload a video to see tracking results here.</pre>
+                </div>
+                <h4>Tracked Video:</h4>
+                <video id="trackedVideo" controls style="width:100%; border-radius:10px; display:none;"></video>
+            </div>
+        </div>
+    </div>
 
         <div class="about-section" id="about">
             <h1>About YOLO Object Detection</h1>
@@ -312,6 +344,63 @@ window.addEventListener('scroll', () => {
 });
 
 window.addEventListener('load', setActiveLink);
+
+const videoUploadForm = document.getElementById('videoUploadForm');
+const videoConfidenceSlider = document.getElementById('videoConfidenceSlider');
+const videoConfidenceValue = document.getElementById('videoConfidenceValue');
+const videoInput = document.getElementById('videoInput');
+const videoFileNameDisplay = document.getElementById('videoFileNameDisplay');
+const videoResultBox = document.getElementById('videoResultBox');
+const trackedVideo = document.getElementById('trackedVideo');
+
+videoConfidenceSlider.addEventListener('input', () => {
+    videoConfidenceValue.textContent = videoConfidenceSlider.value;
+});
+
+videoInput.addEventListener('change', () => {
+    if (videoInput.files.length > 0) {
+        videoFileNameDisplay.textContent = videoInput.files[0].name;
+    }
+});
+
+videoUploadForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const file = videoInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('confidence', videoConfidenceSlider.value);
+
+    videoResultBox.textContent = "Processing video... this can take a while depending on length.";
+    trackedVideo.style.display = 'none';
+
+    try {
+        const response = await fetch('/detect_video', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            videoResultBox.textContent = "Error: " + data.error;
+            return;
+        }
+
+        videoResultBox.textContent =
+            `Frames processed: ${data.frames_processed}\n` +
+            `Max people count in a single frame: ${data.max_people_count}`;
+
+        trackedVideo.src = data.output_video + '?t=' + Date.now();
+        trackedVideo.load();
+        trackedVideo.style.display = 'block';
+
+    } catch (err) {
+        videoResultBox.textContent = "Request failed: " + err.message;
+    }
+});
 </script>
 
 
