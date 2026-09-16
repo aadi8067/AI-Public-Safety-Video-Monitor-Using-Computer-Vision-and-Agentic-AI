@@ -163,21 +163,23 @@ class StablePersonIdentity:
     def __init__(self):
         self.stable_tracks = {}
         self.raw_to_stable = {}
-        self.next_generated_id = 1000
+        self.next_generated_id = 1
 
     def reset(self):
         self.stable_tracks.clear()
         self.raw_to_stable.clear()
-        self.next_generated_id = 1000
+        self.next_generated_id = 1
 
     def _new_id(self, raw_id):
-        if raw_id is not None and raw_id >= 0:
-            stable_id = int(raw_id)
-        else:
-            while self.next_generated_id in self.stable_tracks:
-                self.next_generated_id += 1
-            stable_id = self.next_generated_id
+        # Always hand out the next small sequential number. Never reuse
+        # ByteTrack's raw internal counter directly (that counter never
+        # resets and climbs fast in crowded/occluded scenes — verified:
+        # it produced PERSON-213 for a ~14-person crowd). The public ID
+        # now only grows when a genuinely new stable identity is created.
+        while self.next_generated_id in self.stable_tracks:
             self.next_generated_id += 1
+        stable_id = self.next_generated_id
+        self.next_generated_id += 1
         return stable_id
 
     def assign(self, raw_id, bbox, frame_index):
@@ -661,9 +663,15 @@ def draw_detection(frame, detection, track_id=None):
     else:
         color = (0, 255, 0)
         public_id = detection.get("stable_id")
+        is_threat = detection.get("is_threat", False)
+
         if cls_name.lower() == "person" and public_id is not None:
             raw_id = detection.get("track_id", -1)
-            label = f"PERSON-{int(public_id):03d} BT:{raw_id} {conf:.2f}"
+            if is_threat:
+                color = (0, 0, 255)  # red — linked to a CONFIRMED weapon
+                label = f"ALERT PERSON-{int(public_id):03d} ARMED {conf:.2f}"
+            else:
+                label = f"PERSON-{int(public_id):03d} BT:{raw_id} {conf:.2f}"
         elif track_id is not None and track_id >= 0:
             label = f"{cls_name} #{track_id} {conf:.2f}"
         else:
@@ -743,6 +751,17 @@ def process_video_frame(frame, confidence=0.30, frame_index=0):
         )
         if associated is not None:
             weapon["associated_person_id"] = associated
+
+    # Flag which tracked people are currently carrying a CONFIRMED threat.
+    # CHECK-status weapons do not turn the person's box red yet — only a
+    # confirmed alert does, to avoid flashing red on single-frame noise.
+    threat_person_ids = {
+        d.get("associated_person_id")
+        for d in weapon_detections
+        if d.get("confirmed", False) and d.get("associated_person_id") is not None
+    }
+    for detection in person_detections:
+        detection["is_threat"] = detection.get("stable_id") in threat_person_ids
 
     combined = general_detections + weapon_detections
 
