@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 flask
 flask-cors
 ultralytics
@@ -6,4 +7,14 @@ pandas
 pillow
 numpy
 lap
+=======
+flask
+flask-cors
+ultralytics
+opencv-python
+pandas
+pillow
+numpy
+lap
+>>>>>>> 629a775 (Fix video detection and update surveillance pipeline)
 imageio-ffmpeg
