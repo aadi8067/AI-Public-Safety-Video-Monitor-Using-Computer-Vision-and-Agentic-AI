@@ -1,0 +1,92 @@
+# Virtual Environment
+myenv/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+yolovenv/
+env/
+
+# YOLO training outputs
+runs/
+
+# Dataset
+train/
+valid/
+test/
+
+# Dataset archives
+*.zip
+
+# Old pretrained YOLO models
+yolov8n.pt
+# yolov8s.pt
+yolov8m.pt
+yolo11n.pt
+yolo11n_threat_detection.pt
+weapon-yolo26x-best.pt
+
+# Old YOLO project backup folders
+AIPSM Updated.zip/
+AIPSVM Final Version.zip/
+
+# Generated inference outputs
+outputs/
+
+# Streamlit
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+
+# Cache files
+*.cache
+
+# Environment / secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary project inspection file
+project_structure.txt
+
+# Uploaded/test/outputs images
+uploads/
+outputs/
+
+# Dataset folder
+weapons.yolov8/
+
+# Old project scripts / notebooks
+fine_tune.py
+train.py
+train_best.py
+test_model.py
+verify_dataset.py
+Try_api.ipynb
+streamlit_app.py
+
+# Old root-level dataset images
+000000001536_jpg.rf.b930bd845a4b7c7196c0eea3f83ac2a5.jpg
+000000006590_jpg.rf.a622c27bd17e5b807c5ec0e1bd0f54b5.jpg
+000000031748_jpg.rf.2672fb8b9f6c64e120287531899eaa87.jpg
+
+# Dataset archive
+weapons.yolov8.zip
+
+tuning_results/
