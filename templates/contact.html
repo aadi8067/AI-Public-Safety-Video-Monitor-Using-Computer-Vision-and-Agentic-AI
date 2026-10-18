@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us | YOLO Object Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">
+        <a href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='assets/safety-monitor-icon.svg') }}" alt="AI Safety Video Monitor" style="height:55px;">
+        </a>
+    </div>
+    <ul>
+        <li><a href="{{ url_for('index') }}#hero">Home</a></li>
+        <li><a href="{{ url_for('index') }}#about">About</a></li>
+        <li><a href="{{ url_for('index') }}#faq-section">FAQ</a></li>
+        <li><a href="#contact-section">Contact Us</a></li>
+    </ul>
+</nav>
+
+  <section class="contact-us-container">
+    <div class="contact-form-column">
+      <h1 style="font-size: 2rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; color: #333;">Send Us a Message</h1>
+      <form action="https://formspree.io/f/xblzpgwp" method="POST" id="contactForm" target="_self">
+        <!-- START: Fields wrapped in form-grid for left/right layout -->
+        <div class="form-grid">
+            <input type="text" id="firstName" name="firstName" placeholder="First name *" required>
+            <input type="text" id="lastName" name="lastName" placeholder="Last name *" required>
+            <input type="email" id="email" name="email" placeholder="Email *" required>
+            <input type="text" id="country" name="country" placeholder="Country *" required>
+        </div>
+        <!-- END: Fields wrapped in form-grid -->
+
+        <input type="text" id="companyName" name="companyName" placeholder="Company name">
+        <select id="subject" name="subject" required>
+          <option value="" disabled selected>Subject *</option>
+          <option value="general">General inquiry</option>
+          <option value="sales">Sales</option>
+          <option value="support">Support</option>
+        </select>
+        <textarea id="message" name="message" placeholder="Your Message *" rows="6" required></textarea>
+        <button type="submit" class="send-button">Send</button>
+      </form>
+      <script>
+        const form = document.getElementById("contactForm");
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();  
+            const data = new FormData(form);
+
+            try {
+            const response = await fetch(form.action, {
+                method: form.method,
+                body: data,
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (response.ok) {
+                alert("✅Thank you for contacting us! We’ll get back to you soon.");
+                form.reset();
+            } else {
+                alert("Oops! Something went wrong. Please try again later.");
+            }
+            } catch (error) {
+            alert("Network error. Please check your connection and try again.");
+            }
+        });
+        </script>
+
+    </div>
+
+    <!-- START: Contact details column (was missing details content in your original) -->
+    <div class="contact-details-column">
+        <h2 style="margin-top: 0;">Our Location</h2>
+        <div class="contact-info">
+            <p><i class="fas fa-map-marker-alt"></i> Address: 666, Upper Indira Nagar, Bibwewadi, Pune, Maharashtra, India - 411037</p>
+          
+        </div>
+        
+        <div class="map-container">
+           <iframe
+  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3782.074209744279!2d73.84605837492114!3d18.495676287374894!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2bf44b1f1c6b7%3A0xefa7b6e74f16f1d7!2s666%2C%20Upper%20Indira%20Nagar%2C%20Bibwewadi%2C%20Pune%2C%20Maharashtra%20411037%2C%20India!5e0!3m2!1sen!2sus!4v1600000000000!5m2!1sen!2sus"
+  width="100%"
+  height="450"
+  style="border:0;"
+  allowfullscreen=""
+  loading="lazy"
+  referrerpolicy="no-referrer-when-downgrade">
+</iframe>
+
+        </div>
+    </div>
+    <!-- END: Contact details column -->
+  </section>
+    <script>
+    const form = document.getElementById("contactForm");
+    const statusMsg = document.getElementById("form-status");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+
+        try {
+        const response = await fetch(form.action, {
+            method: form.method,
+            body: data,
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (response.ok) {
+            statusMsg.style.display = "block";
+            form.reset();
+        } else {
+            alert("⚠️ Oops! Something went wrong. Please try again.");
+        }
+        } catch (error) {
+        alert("❌ Network error. Please check your connection.");
+        }
+    });
+    </script>
+
+  <footer>
+        <section class="contact-section" id="contact-section">
+    <div style="max-width:1200px; margin:auto; text-align:center; line-height:1.8;">
+        <p style="font-size:1.2rem; margin-bottom:1rem; font-weight:600;">CONTACT US</p>
+
+        <!-- Top row: Email & Phone -->
+        <div style="margin-bottom:15px;">
+    <span style="margin-right:30px;">
+        <i class="fas fa-envelope"></i> Email: 
+        <a href="mailto:dhakaneaditya50@gmail.com" style="color:#32dde6; text-decoration:none;">dhakaneaditya50@gmail.com</a>
+    </span>
+    <span>
+        <i class="fas fa-phone phone-icon"></i> Phone: 
+        <a href="tel:+911234567890" style="color:#32dde6; text-decoration:none;">+91 12345 67890</a>
+    </span>
+    
+</div>
+      <div style="margin-bottom:15px;">
+       <span style="margin-right:30px; color:white;">
+    <i class="fas fa-map-marker-alt"></i> Address: 
+    <span style="color:#32dde6;">666, Upper Indira Nagar, Bibwewadi, Pune, Maharashtra, India - 411037</span>
+</span></div>
+        <!-- Bottom row: GitHub, Demo, Email -->
+        <div style="margin-bottom:15px;">
+            <a href="https://github.com/aadi8067/AI-Public-Safety-Video-Monitor-Using-Computer-Vision-and-Agentic-AI.git" target="_blank" style="color:#32dde6; text-decoration:none; margin:0 10px;">GitHub Repo</a> |
+            <!-- <a href="https://youtu.be/YourDemoVideoLink" target="_blank" style="color:#32dde6; text-decoration:none; margin:0 10px;">Demo Video</a> | -->
+            <a href="{{ url_for('contact') }}" style="color:#32dde6; text-decoration:none; margin:0 10px;">Need Help?</a>
+        </div>
+
+        <p style="font-size:0.85rem; color:#b3b0b0; margin-top:1rem;">
+            © 2026 SecureSight AI — Advanced Public Safety Surveillance
+        </p>
+    </div>
+</section>
+
+    </footer>
+
+</body>
+</html>

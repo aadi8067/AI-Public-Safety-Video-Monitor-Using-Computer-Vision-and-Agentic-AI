@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YOLO Object Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/> 
+  <style>
+    html {
+      scroll-behavior: smooth; /* enables smooth scroll for anchor links */
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav>
+    <div class="nav-logo">
+      <img src="{{ url_for('static', filename='assets/safety-monitor-logo-full.svg') }}" alt="AI Safety Video Monitor" style="height:80px;">
+    </div>
+    <ul>
+        <li><a href="#home" class="active">Home</a></li>
+        <li><a href="#about">About</a></li>
+    </ul>
+  </nav>
+
+  <!-- About Section -->
+  <div class="about-section" id="about">
+    <h1>About YOLO Object Detection</h1>
+    <p>
+      This Website demonstrates real-time object detection using the YOLO (You Only Look Once) algorithm. 
+      We built this with modern tools to deliver accurate and fast detection in real-world applications.
+    </p>
+
+    <h3>Tools Used</h3>
+    <ul>
+      <li>YOLOv8</li>
+      <li>Flask (Backend Framework)</li>
+      <li>HTML, CSS (Frontend)</li>
+    </ul>
+
+    <h3>Key Features</h3>
+    <ul>
+       <li>Real-time image upload and object detection</li>
+       <li>Annotated output with bounding boxes</li>
+       <li>JSON results for easy integration</li>
+       <li>Lightweight Flask backend for fast deployment</li>
+       <li>User-friendly frontend interface</li>
+    </ul>
+
+    <h3>Meet Our Team</h3>
+    <div class="team">
+      <div class="member-card">
+        <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Aditya Dhakane">
+        <h4>Aditya Dhakane</h4>
+        <p>Project Manager & Agentic AI Developer</p>
+      </div>
+      <div class="member-card">
+        <img src="https://www.w3schools.com/howto/img_avatar2.png" alt="Shreya Anjikhane">
+        <h4>Shreya Anjikhane</h4>
+        <p>Computer Vision & ML Developer</p>
+      </div>
+      <div class="member-card">
+        <img src="https://www.w3schools.com/howto/img_avatar2.png" alt="Arya Shah">
+        <h4>Arya Shah</h4>
+        <p>Backend & API Developer</p>
+      </div>
+      <div class="member-card">
+        <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Vaibhav Mhetre">
+        <h4>Vaibhav Mhetre</h4>
+        <p>UI/UX & Dashboard Developer</p>
+      </div>
+      <div class="member-card">
+        <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Shubham Bhosale">
+        <h4>Shubham Bhosale</h4>
+        <p>Documentation & Project Support</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer style="background:#0056b3; color:#fff; padding:2rem 1rem; margin-top:3rem;">
+    <div style="max-width:1100px; margin:auto; text-align:center;">
+      <p style="font-size:1.1rem; margin-bottom:1rem;"> Connect With Us</p>
+      <p>
+        <a href="https://github.com/YourRepoLink" target="_blank" style="color:#00adb5; text-decoration:none; margin:0 10px;">
+          GitHub Repo
+        </a> |
+        <a href="https://youtu.be/YourDemoVideoLink" target="_blank" style="color:#00adb5; text-decoration:none; margin:0 10px;">
+          Demo Video
+        </a> |
+        <a href="mailto:team@example.com" style="color:#00adb5; text-decoration:none; margin:0 10px;">
+          Email Us
+        </a>
+      </p>
+      <p style="font-size:0.85rem; color:#aaa; margin-top:1rem;">
+        © 2026 SecureSight AI — Advanced Public Safety Surveillance
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

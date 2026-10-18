@@ -1,0 +1,18 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 11
+
+names:
+  - person
+  - gun
+  - knife
+  - sword
+  - automatic_rifle
+  - bazooka
+  - grenade_launcher
+  - handgun
+  - smg
+  - shotgun
+  - sniper

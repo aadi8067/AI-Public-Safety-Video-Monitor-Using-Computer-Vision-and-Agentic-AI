@@ -1,0 +1,9 @@
+Tuning v4 (on top of Agentic AI Final v3). All values can be overridden with env vars.
+LOITERING: LOITER_MAX_DISPLACEMENT_BODY_HEIGHTS 0.65 -> 0.50; new gate: net drift over the
+  last LOITER_DRIFT_WINDOW_SEC (3.0s) must be <= LOITER_MAX_DRIFT_BODY_HEIGHTS (0.25 body heights).
+  Slow walkers keep drifting one way, so they are no longer "loitering".
+FALL: FALL_MIN_DROP_RATIO 0.18 -> 0.24; FALL_HORIZONTAL_RATIO 0.90 -> 1.10;
+  FALL_HEIGHT_DROP_RATIO 0.62 -> 0.46; FALL_VERIFY_SECONDS 0.75 -> 1.20;
+  new FALL_HORIZONTAL_MAX_HEIGHT_RATIO 0.50 (a wide box only counts as lying if height also collapsed).
+  A 90-degree bend / squat / pick-up no longer triggers POSSIBLE_FALL.
+Detector files touched: safety_config.py, loitering_detector.py, fall_detector.py only.
