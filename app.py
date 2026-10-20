@@ -521,6 +521,20 @@ def _run_general_detection(frame, confidence=0.30, tracking=False):
             })
     return detections
 
+# Geometry limits used by the weapon gate.  Uploaded video keeps the original
+# (far-camera) limits.  A live webcam is close range: the person box only
+# covers head/torso and a hand-held knife/gun fills a large part of it, so
+# _LiveRun switches to the relaxed limits below while the camera is running.
+WEAPON_GEOMETRY_VIDEO = {"max_area_ratio": None, "min_rel_y": 0.22, "top_pad": 0.05}
+WEAPON_GEOMETRY_LIVE = {
+    "max_area_ratio": float(os.environ.get("LIVE_WEAPON_MAX_PERSON_AREA_RATIO", "0.80")),
+    "min_rel_y": float(os.environ.get("LIVE_WEAPON_MIN_REL_Y", "-0.05")),
+    "top_pad": 0.20,
+}
+weapon_geometry_mode = {"live": False}
+weapon_reject_stats = {"low_conf": 0, "no_person": 0, "geometry": 0, "accepted": 0}
+
+
 def _weapon_geometry(person, weapon_bbox):
     """Validate that a weapon candidate is plausibly attached to a person.
 
@@ -542,7 +556,8 @@ def _weapon_geometry(person, weapon_bbox):
     # Candidate center must be inside a modestly expanded person box and
     # should be below the head/upper-torso area where weapon-like objects are
     # normally held.  This rejects many signs, bags and background objects.
-    expanded = [px1 - 0.10 * pw, py1 - 0.05 * ph,
+    mode = WEAPON_GEOMETRY_LIVE if weapon_geometry_mode["live"] else WEAPON_GEOMETRY_VIDEO
+    expanded = [px1 - 0.10 * pw, py1 - mode["top_pad"] * ph,
                 px2 + 0.10 * pw, py2 + 0.10 * ph]
     inside = (expanded[0] <= wcx <= expanded[2] and
               expanded[1] <= wcy <= expanded[3])
@@ -552,8 +567,9 @@ def _weapon_geometry(person, weapon_bbox):
     area_ratio = weapon_area / max(person_area, 1.0)
 
     # A very large candidate is unlikely to be a handheld weapon.
-    size_ok = 0.00015 <= area_ratio <= WEAPON_MAX_PERSON_AREA_RATIO
-    vertical_ok = 0.22 <= rel_y <= 1.05
+    max_ratio = mode["max_area_ratio"] or WEAPON_MAX_PERSON_AREA_RATIO
+    size_ok = 0.00015 <= area_ratio <= max_ratio
+    vertical_ok = mode["min_rel_y"] <= rel_y <= 1.05
     horizontal_ok = -0.10 <= rel_x <= 1.10
 
     return bool(inside and size_ok and vertical_ok and horizontal_ok), (rel_x, rel_y)
@@ -597,9 +613,12 @@ def _run_weapon_detection(frame, confidence=WEAPON_CONFIDENCE, person_detections
                 if bbox[2]<=bbox[0] or bbox[3]<=bbox[1]: continue
                 # Association is mandatory; no free-floating weapon alert.
                 assoc=_associate_weapon_with_person({"bbox":bbox},person_detections or [])
-                if assoc is None: continue
+                if assoc is None:
+                    weapon_reject_stats["no_person"]+=1
+                    continue
                 person=next((p for p in person_detections if p.get("stable_id")==assoc),None)
                 geom_ok,rel=_weapon_geometry(person,bbox)
+                weapon_reject_stats["accepted" if geom_ok else "geometry"]+=1
                 # Primary model can keep a candidate with weak geometry for
                 # one frame, but confirmation requires good geometry hits.
                 detections.append({"source":"weapon","class":cls_name,"class_id":int(box.cls[0]),
@@ -1703,61 +1722,518 @@ def detect_video():
 
 # ============================================================
 # LIVE WEBCAM DETECTION
+#
+# The live camera runs the SAME pipeline as an uploaded video
+# (process_video_frame), so every implemented feature is linked to it:
+#
+#   Camera -> YOLO person tracking (ByteTrack + stable PERSON IDs)
+#          -> weapon model + person association + temporal confirmation
+#          -> crowd / loitering / restricted-zone / abnormal-movement / fall
+#          -> Event Correlator -> Agentic Supervisor -> Risk Agent
+#             -> Response Agent (LangGraph)
+#          -> on-frame alerts + incident banner
+#          -> evidence frames + final CSV reports (same files as video)
+#          -> /live/status JSON feeding the dashboard in the Live tab
 # ============================================================
 
-def generate_frames():
-    """Generate annotated webcam frames using the same video pipeline."""
-    camera_index = int(os.environ.get("CAMERA_INDEX", 0))
-    camera = cv2.VideoCapture(camera_index)
+import json
+import threading
+from safety_config import AGENTIC_CORRELATION_WINDOW_SECONDS as _LIVE_INCIDENT_WINDOW
 
-    if not camera.isOpened():
-        raise RuntimeError(f"Could not open webcam index {camera_index}.")
+# The detectors convert frames to seconds with frame_index / fps, and speed /
+# dwell / fall logic depends on it.  The live loop therefore calibrates one
+# real processing rate at the start of a session and then keeps it fixed.
+LIVE_TARGET_FPS = float(os.environ.get("LIVE_TARGET_FPS", 12))
+LIVE_WARMUP_SKIP_FRAMES = 4          # ignore model warm-up when measuring
+LIVE_CALIBRATION_FRAMES = 24         # frames used to measure the real rate
+LIVE_SNAPSHOT_EVERY_SEC = 1.0        # dashboard refresh cadence
+LIVE_STATUS_MAX_EVENTS = 500         # newest safety events returned by /live/status
+LIVE_JPEG_QUALITY = 80
 
-    print(f"Webcam started: index {camera_index}")
-    reset_tracking_state()
 
-    confidence = 0.30
-    frame_index = 0
+def _live_json_safe(obj):
+    """Round-trip through JSON so numpy scalars can never break jsonify."""
+    return json.loads(json.dumps(
+        obj, default=lambda o: o.item() if hasattr(o, "item") else str(o)
+    ))
 
-    try:
-        while True:
-            success, frame = camera.read()
-            if not success:
-                break
 
-            if general_model is not None or weapon_model is not None:
-                annotated_frame, _, _, _, _ = process_video_frame(
-                    frame,
-                    confidence=confidence,
-                    frame_index=frame_index,
-                    fps=30.0,
-                )
-                frame = annotated_frame
-
-            ret, buffer = cv2.imencode(".jpg", frame)
-            if not ret:
-                frame_index += 1
-                continue
-
-            frame_bytes = buffer.tobytes()
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n"
-                + frame_bytes
-                + b"\r\n"
-            )
-
-            frame_index += 1
-            time.sleep(0.03)
-
-    finally:
+def _open_camera(camera_index):
+    """Open a camera; on Windows also try the DirectShow backend."""
+    backends = [None]
+    if sys.platform.startswith("win"):
+        backends.append(cv2.CAP_DSHOW)
+    for backend in backends:
+        camera = (
+            cv2.VideoCapture(camera_index)
+            if backend is None
+            else cv2.VideoCapture(camera_index, backend)
+        )
+        if camera.isOpened():
+            return camera
         camera.release()
-        print("Webcam released")
+    return None
+
+
+class _LatestFrameReader:
+    """Reads the camera on a background thread and only ever hands the
+    pipeline the NEWEST frame, so inference never falls behind a growing
+    camera buffer (which would make the live view lag further and further)."""
+
+    def __init__(self, camera):
+        self.camera = camera
+        self.failed = False
+        self._lock = threading.Lock()
+        self._frame = None
+        self._seq = 0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        failures = 0
+        while not self._stop.is_set():
+            ok, frame = self.camera.read()
+            if not ok:
+                failures += 1
+                if failures >= 40:
+                    self.failed = True
+                    return
+                time.sleep(0.05)
+                continue
+            failures = 0
+            with self._lock:
+                self._frame = frame
+                self._seq += 1
+
+    def read(self, last_seq):
+        with self._lock:
+            if self._frame is None or self._seq == last_seq:
+                return None, last_seq
+            return self._frame.copy(), self._seq
+
+    def stop(self):
+        self._stop.set()
+        self._thread.join(timeout=2.0)
+
+
+class LiveSession:
+    """Shared state between the MJPEG stream thread and the status routes."""
+
+    def __init__(self):
+        self.start_lock = threading.Lock()
+        self.stop_event = threading.Event()
+        self.finished = threading.Event()
+        self.finished.set()
+        self.running = False
+        self.camera_error = None
+        self._lock = threading.Lock()
+        self._status = {"running": False, "live": False}
+
+    def set_status(self, status):
+        with self._lock:
+            self._status = status
+
+    def get_status(self):
+        with self._lock:
+            status = dict(self._status)
+        status["running"] = bool(self.running)
+        status["live"] = bool(self.running)
+        if self.camera_error:
+            status["camera_error"] = self.camera_error
+        return status
+
+    def begin(self):
+        self.camera_error = None
+        self.stop_event.clear()
+        self.finished.clear()
+        self.running = True
+        self.set_status({"running": True, "live": True, "frames_processed": 0})
+
+    def end(self, report):
+        final = dict(report or {})
+        final["final"] = True
+        self.set_status(final)
+        self.running = False
+        self.finished.set()
+
+    def request_stop(self, wait_seconds=15.0):
+        """Ask a running session to stop and wait until it has released the
+        camera and written its final reports."""
+        if not self.running:
+            return True
+        self.stop_event.set()
+        return self.finished.wait(wait_seconds)
+
+
+live_session = LiveSession()
+
+
+def _live_weapon_events_snapshot():
+    """Confirmed weapon events so far: finished ones plus currently active."""
+    events = [dict(e) for e in weapon_event_tracker.final_events]
+    done = {e["weapon_id"] for e in events}
+    for track in list(weapon_event_tracker.tracks.values()):
+        if (track.get("confirmed") and track["candidate_id"] not in done
+                and track.get("event_start_frame") is not None):
+            events.append({
+                "weapon_id": track["candidate_id"],
+                "type": str(track["class"]).upper(),
+                "confidence": float(track["best_confidence"]),
+                "person_id": track.get("person_id"),
+                "start_frame": int(track["event_start_frame"]),
+                "end_frame": int(track.get("event_end_frame") or track["last_frame"]),
+            })
+    return sorted(events, key=lambda e: e["weapon_id"])
+
+
+def _live_incident_snapshot(now_seconds):
+    """Score every incident so far WITHOUT closing them (finalize() would).
+    Returns (all_incidents, worst_currently_active_incident_or_None)."""
+    correlator = agentic_supervisor.correlator
+    incidents = sorted(
+        list(correlator.closed_incidents) + list(correlator.open_incidents),
+        key=lambda i: i.start_time,
+    )
+    scored = []
+    for incident in incidents:
+        item = agentic_supervisor._score(incident.to_dict())
+        item.pop("events", None)  # keep the status payload small
+        scored.append(item)
+
+    rank = {"CRITICAL": 3, "HIGH": 2, "MEDIUM": 1, "LOW": 0}
+    active = [i for i in scored if now_seconds - i["end_time"] <= _LIVE_INCIDENT_WINDOW]
+    worst = max(active, key=lambda i: rank.get(i["risk_severity"], -1)) if active else None
+    return scored, worst
+
+
+class _LiveRun:
+    """One live-camera session: owns the camera, runs the full pipeline on
+    each fresh frame, publishes status, and finalizes reports on close."""
+
+    def __init__(self, camera, camera_index, confidence):
+        self.camera = camera
+        self.camera_index = camera_index
+        self.confidence = confidence
+        self.timestamp = str(int(time.time()))
+        self.capture_dir = os.path.join(
+            OUTPUT_FOLDER, f"captured_frames_live_{self.timestamp}"
+        )
+        os.makedirs(self.capture_dir, exist_ok=True)
+
+        self.frame_index = 0
+        self.fps = max(2.0, LIVE_TARGET_FPS)
+        self.calibrated = False
+        self.max_people = 0
+        self.max_weapons = 0
+        self.people_count = 0
+        self.weapon_count = 0
+        self.crowd_count = 0
+        self.crowd_density = 0.0
+        self.frame_errors = 0
+        self.started = time.time()
+        self._closed = False
+        self._close_lock = threading.Lock()
+        self._last_incidents = []
+        self._last_active = None
+
+        # A new session starts clean (tracks, events, incidents), but a
+        # restricted zone the operator configured via /safety/config or
+        # SAFETY_RESTRICTED_ZONE is kept for the camera.
+        manual_zone = safety_event_pipeline.zone.manual_zone_norm
+        reset_tracking_state()
+        if manual_zone:
+            safety_event_pipeline.set_zones(restricted_zone=manual_zone)
+
+        weapon_geometry_mode["live"] = True
+        for k in weapon_reject_stats: weapon_reject_stats[k] = 0
+        live_session.begin()
+        self.reader = _LatestFrameReader(camera)
+        print(f"Live camera started: index {camera_index}, evidence -> {self.capture_dir}")
+
+    # ------------------------------------------------------------
+    def _save_evidence(self, frame, name):
+        try:
+            cv2.imwrite(os.path.join(self.capture_dir, name), frame)
+        except Exception:
+            pass
+
+    def _build_status(self):
+        now_seconds = self.frame_index / max(self.fps, 1.0)
+        try:
+            incidents, worst = _live_incident_snapshot(now_seconds)
+            self._last_incidents, self._last_active = incidents, worst
+        except Exception as exc:
+            print(f"[live] incident snapshot failed: {exc!r}", file=sys.stderr)
+            incidents, worst = self._last_incidents, self._last_active
+
+        safety_events = safety_event_pipeline.report(self.fps)
+        weapon_events = _live_weapon_events_snapshot()
+        return _live_json_safe({
+            "running": True,
+            "live": True,
+            "calibrated": self.calibrated,
+            "camera_index": self.camera_index,
+            "frames_processed": self.frame_index,
+            "fps": round(self.fps, 2),
+            "uptime_seconds": round(time.time() - self.started, 1),
+            "confidence": self.confidence,
+            "people_count": self.people_count,
+            "weapon_count": self.weapon_count,
+            "max_people_count": self.max_people,
+            "max_weapon_count": self.max_weapons,
+            "crowd_count": self.crowd_count,
+            "crowd_density": round(float(self.crowd_density), 4),
+            "weapon_events": weapon_events,
+            "safety_events": safety_events[-LIVE_STATUS_MAX_EVENTS:],
+            "safety_event_total": len(safety_events),
+            "incidents": incidents,
+            "active_incident": worst,
+            "detector_errors": dict(safety_event_pipeline.detector_errors),
+            "weapon_candidates": dict(weapon_reject_stats),
+            "frame_errors": self.frame_errors,
+            "agentic_backend": agentic_supervisor.agentic_backend,
+            "restricted_zone_normalized": safety_event_pipeline.restricted_zone_norm,
+            "loitering_zone_normalized": safety_event_pipeline.loitering_zone_norm,
+            "captured_frames": f"/outputs/{os.path.basename(self.capture_dir)}",
+        })
+
+    def _next_frame(self, last_seq):
+        while not live_session.stop_event.is_set():
+            if self.reader.failed:
+                live_session.camera_error = (
+                    "The camera stopped delivering frames (unplugged, or in "
+                    "use by another application)."
+                )
+                return None, last_seq
+            frame, seq = self.reader.read(last_seq)
+            if frame is not None:
+                return frame, seq
+            time.sleep(0.004)
+        return None, last_seq
+
+    # ------------------------------------------------------------
+    def frames(self):
+        """MJPEG generator. Always ends in close() so the camera is released
+        and the final reports are written, however the stream stops."""
+        last_seq = 0
+        calib_t0 = None
+        next_deadline = None
+        last_snapshot = 0.0
+        try:
+            while not live_session.stop_event.is_set():
+                # --- calibrate one real processing rate, then lock it ---
+                if not self.calibrated:
+                    if self.frame_index == LIVE_WARMUP_SKIP_FRAMES:
+                        calib_t0 = time.time()
+                    elif (calib_t0 is not None and self.frame_index ==
+                          LIVE_WARMUP_SKIP_FRAMES + LIVE_CALIBRATION_FRAMES):
+                        measured = LIVE_CALIBRATION_FRAMES / max(time.time() - calib_t0, 1e-3)
+                        self.fps = max(2.0, min(LIVE_TARGET_FPS, measured))
+                        self.calibrated = True
+                        print(f"Live pipeline rate locked at {self.fps:.1f} fps "
+                              f"(measured {measured:.1f}, target {LIVE_TARGET_FPS:.1f})")
+                else:
+                    # Pace to the locked rate when the hardware is faster.
+                    interval = 1.0 / self.fps
+                    if next_deadline is None:
+                        next_deadline = time.time()
+                    remaining = next_deadline - time.time()
+                    if remaining > 0:
+                        live_session.stop_event.wait(remaining)
+                    next_deadline = max(next_deadline + interval, time.time() - interval)
+
+                frame, last_seq = self._next_frame(last_seq)
+                if frame is None:
+                    break
+
+                new_alert = False
+                try:
+                    (annotated, detections, people_count, weapon_count,
+                     safety_result) = process_video_frame(
+                        frame, self.confidence,
+                        frame_index=self.frame_index, fps=self.fps,
+                    )
+                except Exception:
+                    self.frame_errors += 1
+                    if self.frame_errors == 1:
+                        print("\n[live] frame processing failed -- full traceback:", file=sys.stderr)
+                        traceback.print_exc()
+                    annotated, detections, safety_result = frame, [], {}
+                    people_count, weapon_count = self.people_count, self.weapon_count
+
+                self.people_count = people_count
+                self.weapon_count = weapon_count
+                self.max_people = max(self.max_people, people_count)
+                self.max_weapons = max(self.max_weapons, weapon_count)
+                self.crowd_count = safety_result.get("crowd_count", people_count)
+                self.crowd_density = safety_result.get("crowd_density", 0.0)
+
+                # Evidence frames: same rules/names as the uploaded-video path.
+                for event in safety_result.get("events", []):
+                    new_alert = True
+                    event_type = str(event.get("event_type", "EVENT"))
+                    pid = event.get("person_id")
+                    pid_text = f"PERSON-{int(pid):03d}" if pid is not None else "ALL"
+                    safe_type = re.sub(r"[^A-Za-z0-9_-]+", "_", event_type)
+                    self._save_evidence(
+                        annotated,
+                        f"evidence_{safe_type}_{pid_text}_frame_{self.frame_index:06d}.jpg",
+                    )
+                for detection in detections:
+                    if detection.get("source") == "weapon" and detection.get("newly_confirmed"):
+                        new_alert = True
+                        wid = int(detection.get("weapon_id", 0))
+                        self._save_evidence(
+                            annotated,
+                            f"evidence_WEAPON-{wid:03d}_frame_{self.frame_index:06d}.jpg",
+                        )
+
+                # Small LIVE clock in the bottom-right corner.
+                h, w = annotated.shape[:2]
+                elapsed = int(time.time() - self.started)
+                label = f"LIVE {elapsed // 60:02d}:{elapsed % 60:02d} | {self.fps:.0f} fps"
+                (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+                cv2.putText(annotated, label, (w - tw - 10, h - 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+
+                self.frame_index += 1
+
+                now = time.time()
+                if new_alert or now - last_snapshot >= LIVE_SNAPSHOT_EVERY_SEC:
+                    live_session.set_status(self._build_status())
+                    last_snapshot = now
+
+                ok, buffer = cv2.imencode(
+                    ".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, LIVE_JPEG_QUALITY]
+                )
+                if not ok:
+                    continue
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + buffer.tobytes()
+                    + b"\r\n"
+                )
+        finally:
+            self.close()
+
+    # ------------------------------------------------------------
+    def close(self):
+        """Idempotent teardown: release the camera, close every open weapon
+        track and incident, write the same CSV reports as /detect_video."""
+        with self._close_lock:
+            if self._closed:
+                return
+            self._closed = True
+
+        weapon_geometry_mode["live"] = False
+        try:
+            self.reader.stop()
+        except Exception:
+            pass
+        try:
+            self.camera.release()
+        except Exception:
+            pass
+
+        try:
+            report = self._finalize()
+        except Exception as exc:
+            print("\n[live] finalizing the session failed:", repr(exc), file=sys.stderr)
+            traceback.print_exc()
+            report = {"error": f"Could not finalize live session: {exc}"}
+        live_session.end(report)
+        print("Live camera stopped and released")
+
+    def _finalize(self):
+        fps = self.fps
+        final_weapon_events = weapon_event_tracker.finalize_all(max(0, self.frame_index - 1))
+        final_safety_events = safety_event_pipeline.report(fps)
+        final_incidents = agentic_supervisor.finalize()
+
+        print("\n" + "=" * 70)
+        print("LIVE SESSION REPORT")
+        print("=" * 70)
+        print(f"Frames processed : {self.frame_index} @ {fps:.1f} fps")
+        print(f"Weapon alerts    : {len(final_weapon_events)}")
+        for e in final_weapon_events:
+            who = f"PERSON-{int(e['person_id']):03d}" if e.get("person_id") is not None else "UNASSIGNED"
+            print(f"  WEAPON-{int(e['weapon_id']):03d} {e['type']} conf={e['confidence']:.2f} -> {who} "
+                  f"({e['start_frame'] / max(fps, 1.0):.1f}s-{e['end_frame'] / max(fps, 1.0):.1f}s)")
+        print(f"Safety events    : {len(final_safety_events)}")
+        print(f"Agentic incidents: {len(final_incidents)}")
+        for inc in final_incidents:
+            print(f"  [{inc['incident_id']}] {inc['risk_severity']} ({inc['risk_score']}/100) "
+                  f"{'+'.join(inc['event_types'])} -> {', '.join(inc['response_action_labels'])}")
+        print(f"Evidence folder  : {self.capture_dir}")
+        print("=" * 70)
+
+        weapon_columns = ["weapon_id", "type", "confidence", "person_id", "start_frame", "end_frame"]
+        pd.DataFrame(final_weapon_events, columns=weapon_columns).to_csv(
+            os.path.join(self.capture_dir, "final_weapon_report.csv"), index=False)
+        pd.DataFrame(final_safety_events).to_csv(
+            os.path.join(self.capture_dir, "final_safety_event_report.csv"), index=False)
+
+        incident_columns = [
+            "incident_id", "start_time", "end_time", "duration_seconds", "person_ids",
+            "event_types", "event_count", "risk_score", "risk_severity", "response_actions",
+        ]
+        incident_rows = [{
+            "incident_id": i["incident_id"],
+            "start_time": i["start_time"],
+            "end_time": i["end_time"],
+            "duration_seconds": i["duration_seconds"],
+            "person_ids": ",".join(str(p) for p in i["person_ids"]) or "SCENE-WIDE",
+            "event_types": "+".join(i["event_types"]),
+            "event_count": i["event_count"],
+            "risk_score": i["risk_score"],
+            "risk_severity": i["risk_severity"],
+            "response_actions": ",".join(i["response_actions"]),
+        } for i in final_incidents]
+        pd.DataFrame(incident_rows, columns=incident_columns).to_csv(
+            os.path.join(self.capture_dir, "final_incident_report.csv"), index=False)
+
+        folder = os.path.basename(self.capture_dir)
+        for incident in final_incidents:
+            incident.pop("events", None)
+        return _live_json_safe({
+            "running": False,
+            "live": False,
+            "camera_index": self.camera_index,
+            "frames_processed": self.frame_index,
+            "fps": round(fps, 2),
+            "estimated_duration_seconds": self.frame_index / fps if fps > 0 else None,
+            "uptime_seconds": round(time.time() - self.started, 1),
+            "people_count": 0,
+            "weapon_count": 0,
+            "crowd_count": 0,
+            "crowd_density": 0.0,
+            "max_people_count": self.max_people,
+            "max_weapon_count": self.max_weapons,
+            "weapon_events": final_weapon_events,
+            "safety_events": final_safety_events[-LIVE_STATUS_MAX_EVENTS:],
+            "safety_event_total": len(final_safety_events),
+            "incidents": final_incidents,
+            "active_incident": None,
+            "captured_frames": f"/outputs/{folder}",
+            "weapon_report": f"/outputs/{folder}/final_weapon_report.csv",
+            "safety_report": f"/outputs/{folder}/final_safety_event_report.csv",
+            "incident_report": f"/outputs/{folder}/final_incident_report.csv",
+            "detector_errors": dict(safety_event_pipeline.detector_errors),
+            "frame_errors": self.frame_errors,
+            "agentic_backend": agentic_supervisor.agentic_backend,
+            "restricted_zone_normalized": safety_event_pipeline.restricted_zone_norm,
+            "loitering_zone_normalized": safety_event_pipeline.loitering_zone_norm,
+        })
 
 
 @app.route("/live")
 def live():
+    """Start the live camera and stream the annotated MJPEG feed.
 
+    Optional query parameters: camera (index, default CAMERA_INDEX or 0),
+    confidence (0.05-0.95, default 0.30)."""
     if (
         general_model is None
         and weapon_model is None
@@ -1768,13 +2244,65 @@ def live():
             "No detection model is loaded."
         }), 500
 
-    return Response(
-        generate_frames(),
+    try:
+        camera_index = int(request.args.get("camera", os.environ.get("CAMERA_INDEX", 0)))
+    except ValueError:
+        camera_index = 0
+    try:
+        confidence = float(request.args.get("confidence", 0.30))
+    except ValueError:
+        confidence = 0.30
+    confidence = max(0.05, min(confidence, 0.95))
+
+    with live_session.start_lock:
+        # Only one live session at a time: stop any previous one first so the
+        # camera is free and the shared trackers are not used by two streams.
+        live_session.request_stop(wait_seconds=15.0)
+
+        camera = _open_camera(camera_index)
+        if camera is None:
+            message = (
+                f"Could not open camera index {camera_index}. Check that a camera "
+                "is connected, not used by another application, and try another "
+                "index (CAMERA_INDEX env var or the camera box in the Live tab)."
+            )
+            live_session.camera_error = message
+            live_session.set_status({"running": False, "live": False})
+            return jsonify({"error": message}), 500
+
+        run = _LiveRun(camera, camera_index, confidence)
+
+    response = Response(
+        run.frames(),
         mimetype=(
             "multipart/x-mixed-replace; "
             "boundary=frame"
         )
     )
+    # If the client disconnects before the first frame is produced the
+    # generator never starts; this still releases the camera.
+    response.call_on_close(run.close)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@app.route("/live/status", methods=["GET"])
+def live_status():
+    """Live dashboard data: counts, safety events, weapon alerts and scored
+    Agentic AI incidents so far (same shape the video report uses)."""
+    return jsonify(live_session.get_status())
+
+
+@app.route("/live/stop", methods=["POST"])
+def live_stop():
+    """Stop the live camera, release it, write the reports and return the
+    final report (same shape as the /detect_video response)."""
+    was_running = live_session.running
+    stopped = live_session.request_stop(wait_seconds=20.0)
+    status = live_session.get_status()
+    status["was_running"] = was_running
+    status["stopped_cleanly"] = bool(stopped)
+    return jsonify(status)
 
 
 # ============================================================

@@ -1210,3 +1210,34 @@ footer {
     color: var(--accent-purple, #8b5cf6);
     border: 1px solid rgba(139, 92, 246, 0.35);
 }
+
+/* ===== Live camera: error + alert banner (additive) ===== */
+.live-error {
+    margin: 0 0 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--accent-red);
+    background: rgba(255, 59, 92, 0.12);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.live-alert-banner {
+    margin: 0 0 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-family: var(--font-head);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+}
+
+.live-alert-banner.alert-critical {
+    background: var(--accent-red);
+    animation: pulseLive 1.4s infinite;
+}
+
+.live-alert-banner.alert-high {
+    background: var(--accent-amber);
+    color: #06111f;
+}

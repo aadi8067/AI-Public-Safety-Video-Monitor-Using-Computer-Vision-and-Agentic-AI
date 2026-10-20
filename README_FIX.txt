@@ -67,3 +67,27 @@ V6 -- AGENTIC AI NOW RUNS ON LANGCHAIN + LANGGRAPH (behaviour unchanged)
   `python3 self_test.py` on your machine to confirm against the real
   libraries -- the self-test prints which backend (langgraph vs fallback)
   actually ran.
+
+
+V7 -- LIVE CAMERA NOW RUNS THE FULL PIPELINE (video path unchanged)
+- Live tab -> server camera (CAMERA_INDEX, default 0, or the "Camera index" box) -> /live (MJPEG).
+- The live feed runs the SAME process_video_frame() as an uploaded video, so everything is linked:
+  ByteTrack + stable PERSON ids, weapon model + person association + temporal confirmation,
+  crowd / loitering / restricted-zone / abnormal-movement / fall detectors, Event Correlator ->
+  Agentic Supervisor -> Risk Agent -> Response Agent (LangGraph), incident banner on the frame.
+- New routes: GET /live/status (live dashboard data, polled every second by the Live tab) and
+  POST /live/stop (stops the camera, closes open weapon tracks/incidents, returns the final report).
+- Evidence frames + the same three CSV reports as /detect_video are written to
+  outputs/captured_frames_live_<timestamp>/ (final_weapon_report.csv, final_safety_event_report.csv,
+  final_incident_report.csv). Reports are also written if the browser tab is closed.
+- Frame rate: the detectors turn frame_index/fps into seconds, so the live loop measures the real
+  processing rate during the first ~2 s, locks it (capped at LIVE_TARGET_FPS, default 12) and paces
+  to it. The old hard-coded fps=30 made speeds look ~2-4x too fast on a normal PC.
+- A restricted zone set via /safety/config or SAFETY_RESTRICTED_ZONE is kept when the camera starts;
+  otherwise it is auto-detected from the camera view, exactly as for video.
+- Only one live session at a time (starting a new one stops the previous). Leaving the Live tab
+  stops the camera. Do not process an uploaded video while the camera is running.
+- Unchanged: detectors, pipeline, agentic layer, /detect_video, /detect, /detect_live_frame,
+  the Upload Video tab and its dashboard.
+
+LIVE WEAPON FIX: live camera now uses relaxed close-range weapon geometry (max weapon/person area 0.80, env LIVE_WEAPON_MAX_PERSON_AREA_RATIO). Uploaded-video limits unchanged. /live/status now includes weapon_candidates (accepted/geometry/no_person counts) for diagnosis.
