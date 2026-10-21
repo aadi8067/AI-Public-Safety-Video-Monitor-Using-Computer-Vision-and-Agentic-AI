@@ -9,3 +9,4 @@ lap
 imageio-ffmpeg
 langchain-core>=1.0,<2.0
 langgraph>=1.0,<2.0
+psycopg[binary]>=3.3,<4.0
