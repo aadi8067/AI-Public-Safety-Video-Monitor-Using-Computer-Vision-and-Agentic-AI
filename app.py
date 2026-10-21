@@ -20,6 +20,7 @@ import time
 from safety_event_pipeline import SafetyEventPipeline
 from safety_config import WEAPON_MAX_PERSON_AREA_RATIO
 from agentic_ai import AgenticSupervisor
+from report_agent import generate_incident_reports
 
 # ============================================================
 # FLASK APP
@@ -1574,6 +1575,14 @@ def detect_video():
             ]).to_csv(incident_report_csv, index=False)
 
         # ----------------------------------------------------
+        # REPORT AGENT — one compact report per finalized incident
+        # ----------------------------------------------------
+        capture_dir_name = os.path.basename(capture_dir)
+        incident_reports = generate_incident_reports(
+            final_incidents, fps, capture_dir, capture_dir_name
+        )
+
+        # ----------------------------------------------------
         # RE-ENCODE TO H.264 FOR BROWSER PLAYBACK
         # ----------------------------------------------------
 
@@ -1677,6 +1686,9 @@ def detect_video():
 
             "incidents":
             final_incidents,
+
+            "incident_reports":
+            incident_reports,
 
             "captured_frames":
             f"/outputs/{os.path.basename(capture_dir)}",
@@ -2195,6 +2207,11 @@ class _LiveRun:
             os.path.join(self.capture_dir, "final_incident_report.csv"), index=False)
 
         folder = os.path.basename(self.capture_dir)
+        # Report Agent — one compact report per finalized incident.
+        # Must run BEFORE incident.pop("events") below.
+        incident_reports = generate_incident_reports(
+            final_incidents, fps, self.capture_dir, folder
+        )
         for incident in final_incidents:
             incident.pop("events", None)
         return _live_json_safe({
@@ -2220,6 +2237,7 @@ class _LiveRun:
             "weapon_report": f"/outputs/{folder}/final_weapon_report.csv",
             "safety_report": f"/outputs/{folder}/final_safety_event_report.csv",
             "incident_report": f"/outputs/{folder}/final_incident_report.csv",
+            "incident_reports": incident_reports,
             "detector_errors": dict(safety_event_pipeline.detector_errors),
             "frame_errors": self.frame_errors,
             "agentic_backend": agentic_supervisor.agentic_backend,

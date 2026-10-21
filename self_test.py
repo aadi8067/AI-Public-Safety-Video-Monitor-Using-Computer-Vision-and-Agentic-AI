@@ -188,3 +188,174 @@ if __name__=="__main__":
     test_agentic_graph_pipeline_matches_direct_calls(); print("AGENTIC-GRAPH-PARITY: PASS")
     print(f"AGENTIC PIPELINE BACKEND: {backend_status()}")
     print("SELF-TEST PASS")
+
+
+# ============================================================
+# REPORT AGENT TESTS
+# ============================================================
+
+def _make_incident(incident_id="INC-0001", events=None, risk_score=58.4,
+                   risk_severity="HIGH", start_time=1.8, end_time=4.04,
+                   person_ids=None):
+    """Build a minimal finalized incident dict as AgenticSupervisor.finalize()
+    would return it (risk + response already merged in)."""
+    if person_ids is None:
+        person_ids = [3]
+    if events is None:
+        events = [
+            {"event_type": "HIGH_DENSITY",      "frame": 45,  "timestamp": 1.8,  "person_id": None, "confidence": 0.72, "severity": "HIGH",   "details": {}},
+            {"event_type": "ABNORMAL_MOVEMENT",  "frame": 63,  "timestamp": 2.52, "person_id": 3,    "confidence": 0.65, "severity": "MEDIUM", "details": {}},
+            {"event_type": "POSSIBLE_FALL",      "frame": 101, "timestamp": 4.04, "person_id": 3,    "confidence": 0.85, "severity": "HIGH",   "details": {}},
+        ]
+    return {
+        "incident_id":     incident_id,
+        "start_time":      start_time,
+        "end_time":        end_time,
+        "duration_seconds": round(end_time - start_time, 2),
+        "person_ids":      person_ids,
+        "event_types":     sorted({e["event_type"] for e in events}),
+        "event_count":     len(events),
+        "events":          events,
+        # Risk Agent fields
+        "risk_score":      risk_score,
+        "risk_severity":   risk_severity,
+        "risk_explanation": f"{risk_severity} ({risk_score}/100) test",
+        "risk_factors":    [],
+        "risk_bonuses":    [],
+        # Response Agent fields
+        "response_actions": ["LOG_INCIDENT", "FLAG_FOR_REVIEW", "DISPATCH_ALERT"],
+        "response_action_labels": ["Log incident", "Flag for review", "Dispatch alert"],
+    }
+
+
+def test_report_agent_basic_structure():
+    """Generated report must contain all required keys and correct values."""
+    from report_agent import ReportAgent
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        inc = _make_incident()
+        report = ReportAgent().generate(inc, fps=25.0, capture_dir=tmp, capture_dir_name="captured_frames_TEST")
+        assert report["incident_id"] == "INC-0001"
+        assert report["risk_score"] == 58.4
+        assert report["risk_severity"] == "HIGH"
+        assert abs(report["start_time"] - 1.8) < 0.01
+        assert abs(report["end_time"] - 4.04) < 0.01
+        assert "PERSON-003" in report["persons"]
+        assert isinstance(report["summary"], str) and len(report["summary"]) > 10
+        assert isinstance(report["evidence"], list)
+        assert isinstance(report["response_actions"], list)
+        assert "LOG_INCIDENT" in report["response_actions"]
+
+
+def test_report_agent_evidence_exists():
+    """When an evidence file exists, image_url must be a valid path string."""
+    from report_agent import ReportAgent, _evidence_filename_for_event
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        # Create the exact file detect_video() would have written.
+        ev = {"event_type": "POSSIBLE_FALL", "frame": 101, "person_id": 3, "timestamp": 4.04, "confidence": 0.85, "severity": "HIGH", "details": {}}
+        filename = _evidence_filename_for_event(ev)
+        open(os.path.join(tmp, filename), "w").close()   # create empty placeholder
+
+        inc = _make_incident(events=[ev], person_ids=[3])
+        report = ReportAgent().generate(inc, fps=25.0, capture_dir=tmp, capture_dir_name="captured_frames_TEST")
+        assert len(report["evidence"]) == 1
+        e = report["evidence"][0]
+        assert e["exists"] is True
+        assert e["image_url"] == "/outputs/captured_frames_TEST/" + filename
+        assert e["time_seconds"] == round(101 / 25.0, 2)
+
+
+def test_report_agent_missing_evidence():
+    """When an evidence file is absent, image_url is None and exists is False."""
+    from report_agent import ReportAgent
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        inc = _make_incident()   # files never created
+        report = ReportAgent().generate(inc, fps=25.0, capture_dir=tmp, capture_dir_name="captured_frames_TEST")
+        # All evidence entries must have exists=False and image_url=None
+        for e in report["evidence"]:
+            assert e["exists"] is False
+            assert e["image_url"] is None
+
+
+def test_report_agent_weapon_evidence_filename():
+    """WEAPON_CONFIRMED events must resolve to the weapon-specific filename."""
+    from report_agent import _evidence_filename_for_event
+    ev = {"event_type": "WEAPON_CONFIRMED", "frame": 112, "person_id": 7,
+          "timestamp": 4.48, "confidence": 0.78, "severity": "CRITICAL",
+          "details": {"weapon_id": 33, "weapon_type": "gun"}}
+    filename = _evidence_filename_for_event(ev)
+    assert filename == "evidence_WEAPON-033_frame_000112.jpg"
+
+
+def test_report_agent_no_events_no_crash():
+    """An incident with an empty events list must not raise."""
+    from report_agent import ReportAgent
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        inc = _make_incident(events=[], person_ids=[])
+        report = ReportAgent().generate(inc, fps=25.0, capture_dir=tmp, capture_dir_name="x")
+        assert report["evidence"] == []
+        assert report["persons"] == "SCENE-WIDE"
+
+
+def test_report_agent_two_incidents_independent():
+    """Two incidents must produce two separate reports with no cross-contamination."""
+    from report_agent import generate_incident_reports
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        inc1 = _make_incident("INC-0001", person_ids=[3], risk_score=58.4, risk_severity="HIGH")
+        inc2 = _make_incident("INC-0002", person_ids=[9], risk_score=75.0, risk_severity="CRITICAL",
+                              start_time=20.0, end_time=21.0,
+                              events=[{"event_type": "WEAPON_CONFIRMED", "frame": 500,
+                                       "person_id": 9, "timestamp": 20.0, "confidence": 0.9,
+                                       "severity": "CRITICAL",
+                                       "details": {"weapon_id": 1, "weapon_type": "gun"}}])
+        reports = generate_incident_reports([inc1, inc2], fps=25.0,
+                                            capture_dir=tmp, capture_dir_name="x")
+        assert len(reports) == 2
+        ids = {r["incident_id"] for r in reports}
+        assert ids == {"INC-0001", "INC-0002"}
+        r1 = next(r for r in reports if r["incident_id"] == "INC-0001")
+        r2 = next(r for r in reports if r["incident_id"] == "INC-0002")
+        assert "PERSON-003" in r1["persons"]
+        assert "PERSON-009" in r2["persons"]
+        assert r1["risk_severity"] == "HIGH"
+        assert r2["risk_severity"] == "CRITICAL"
+
+
+def test_report_agent_does_not_mutate_incident():
+    """ReportAgent.generate() must not modify the original incident dict."""
+    from report_agent import ReportAgent
+    import copy, tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        inc = _make_incident()
+        original = copy.deepcopy(inc)
+        ReportAgent().generate(inc, fps=25.0, capture_dir=tmp, capture_dir_name="x")
+        assert inc == original
+
+
+if __name__ == "__main__":
+    print("AUTO ZONE:", test_zone())
+    test_no_zone(); print("NO-ZONE: PASS")
+    test_fall(); print("FALL: PASS")
+    test_correlator_groups_close_related_events(); print("CORRELATOR-GROUP: PASS")
+    test_correlator_splits_unrelated_people(); print("CORRELATOR-SPLIT: PASS")
+    test_correlator_closes_stale_incidents(); print("CORRELATOR-STALE: PASS")
+    test_risk_agent_weapon_alone_is_always_critical(); print("RISK-WEAPON-FLOOR: PASS")
+    test_risk_agent_scales_with_correlated_signals(); print("RISK-CORRELATION-SCALING: PASS")
+    test_response_agent_action_table_is_fixed(); print("RESPONSE-ACTION-TABLE: PASS")
+    test_agentic_supervisor_end_to_end(); print("AGENTIC-SUPERVISOR-E2E: PASS")
+    test_zone_survives_opencv_line_array_shapes(); print("ZONE-HOUGH-SHAPES: PASS")
+    test_pipeline_isolates_detector_failures(); print("PIPELINE-FAULT-ISOLATION: PASS")
+    test_agentic_graph_pipeline_matches_direct_calls(); print("AGENTIC-GRAPH-PARITY: PASS")
+    print(f"AGENTIC PIPELINE BACKEND: {backend_status()}")
+    test_report_agent_basic_structure(); print("REPORT-AGENT-STRUCTURE: PASS")
+    test_report_agent_evidence_exists(); print("REPORT-AGENT-EVIDENCE-EXISTS: PASS")
+    test_report_agent_missing_evidence(); print("REPORT-AGENT-MISSING-EVIDENCE: PASS")
+    test_report_agent_weapon_evidence_filename(); print("REPORT-AGENT-WEAPON-FILENAME: PASS")
+    test_report_agent_no_events_no_crash(); print("REPORT-AGENT-EMPTY-EVENTS: PASS")
+    test_report_agent_two_incidents_independent(); print("REPORT-AGENT-TWO-INCIDENTS: PASS")
+    test_report_agent_does_not_mutate_incident(); print("REPORT-AGENT-NO-MUTATION: PASS")
+    print("SELF-TEST PASS")

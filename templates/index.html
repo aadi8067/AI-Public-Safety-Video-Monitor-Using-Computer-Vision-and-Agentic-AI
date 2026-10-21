@@ -182,7 +182,28 @@
                 </div>
             </div>
 
-            <!-- ===================== LIVE CAMERA PANEL ===================== -->
+            <!-- ===================== REPORT AGENT SECTION (VIDEO) ===================== -->
+            <div id="reportAgentSection" style="display:none; margin-top:24px;">
+                <div style="
+                    border:2px solid rgba(0,229,255,0.30);
+                    border-radius:16px;
+                    background:linear-gradient(135deg,rgba(0,229,255,0.04) 0%,rgba(7,12,23,0.95) 100%);
+                    padding:28px 28px 20px;
+                ">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+                        <span style="font-size:1.35rem;">📋</span>
+                        <h3 style="margin:0; font-size:1.25rem; color:#00e5ff; letter-spacing:0.03em;">
+                            Report Agent — Incident Reports
+                        </h3>
+                    </div>
+                    <p style="margin:0 0 20px; font-size:0.88rem; color:#8b9bc0; border-bottom:1px solid rgba(0,229,255,0.12); padding-bottom:14px;">
+                        One concise report per correlated incident. Risk score and response actions come directly
+                        from the Risk Agent and Response Agent. Evidence thumbnails link to the annotated frame
+                        captured at the exact moment each event fired.
+                    </p>
+                    <div id="reportAgentList"></div>
+                </div>
+            </div>
             <div class="mode-panel" id="livePanel" style="display:none;">
                 <div class="detection-studio-layout">
                     <div class="controls-panel">
@@ -240,6 +261,8 @@
                         <p class="empty-note" id="liveIncidentsEmpty">No correlated incidents so far — individual events (if any) have not clustered into a larger situation.</p>
                     </div>
 
+                    <!-- live report agent rendered outside this div -->
+
                     <div class="dashboard-stats-grid" id="liveDashboardStats"></div>
 
                     <div class="dashboard-columns">
@@ -287,6 +310,32 @@
                 </div>
             </div>
         </div>
+
+            <!-- ===================== LIVE REPORT AGENT SECTION ===================== -->
+            <div id="liveReportAgentSection" style="display:none; margin-top:24px; padding:0 0 24px;">
+                <div style="
+                    border:2px solid rgba(0,229,255,0.30);
+                    border-radius:16px;
+                    background:linear-gradient(135deg,rgba(0,229,255,0.04) 0%,rgba(7,12,23,0.95) 100%);
+                    padding:28px 28px 20px;
+                ">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+                        <span style="font-size:1.35rem;">📋</span>
+                        <h3 style="margin:0; font-size:1.25rem; color:#00e5ff; letter-spacing:0.03em;">
+                            Report Agent — Incident Reports
+                        </h3>
+                        <span style="margin-left:auto; font-size:0.78rem; color:#8b9bc0; background:rgba(0,229,255,0.08); border:1px solid rgba(0,229,255,0.18); border-radius:20px; padding:3px 10px;">
+                            Final session report
+                        </span>
+                    </div>
+                    <p style="margin:0 0 20px; font-size:0.88rem; color:#8b9bc0; border-bottom:1px solid rgba(0,229,255,0.12); padding-bottom:14px;">
+                        One concise report per correlated incident. Risk score and response actions come directly
+                        from the Risk Agent and Response Agent. Evidence thumbnails link to the annotated frame
+                        captured at the exact moment each event fired.
+                    </p>
+                    <div id="liveReportAgentList"></div>
+                </div>
+            </div>
 
         <div class="about-section" id="about">
             <h1>About This Project</h1>
@@ -913,6 +962,9 @@
                 dlIncidents.href = data.incident_report;
                 dlIncidents.style.display = 'inline-flex';
             }
+
+            // ---- Report Agent ----
+            renderReportAgent(data.incident_reports || [], 'reportAgentSection', 'reportAgentList');
         }
 
         // ---- Agentic AI incident cards ----
@@ -1134,6 +1186,177 @@
                 } else {
                     a.style.display = 'none';
                 }
+            });
+
+            // ---- Live Report Agent (shown only on final stop) ----
+            if (isFinal) {
+                renderReportAgent(data.incident_reports || [], 'liveReportAgentSection', 'liveReportAgentList');
+            }
+        }
+
+        // ============================================================
+        // REPORT AGENT RENDERER
+        // ============================================================
+        function renderReportAgent(reports, cardId, listId) {
+            const card = document.getElementById(cardId);
+            const list = document.getElementById(listId);
+            if (!card || !list) return;
+            list.innerHTML = '';
+
+            if (!reports || !reports.length) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            const rank = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
+            const sorted = [...reports].sort((a, b) =>
+                (rank[b.risk_severity] ?? -1) - (rank[a.risk_severity] ?? -1));
+
+            const severityColors = {
+                CRITICAL: { border: '#ef4444', bg: 'rgba(239,68,68,0.06)',  badge: '#ef4444' },
+                HIGH:     { border: '#f97316', bg: 'rgba(249,115,22,0.06)', badge: '#f97316' },
+                MEDIUM:   { border: '#eab308', bg: 'rgba(234,179,8,0.06)',  badge: '#eab308' },
+                LOW:      { border: '#22c55e', bg: 'rgba(34,197,94,0.06)',  badge: '#22c55e' },
+            };
+
+            sorted.forEach((r, idx) => {
+                const col = severityColors[r.risk_severity] || severityColors.LOW;
+                const isLast = idx === sorted.length - 1;
+
+                const wrap = document.createElement('div');
+                wrap.style.cssText = `
+                    border-left: 4px solid ${col.border};
+                    background: ${col.bg};
+                    border-radius: 10px;
+                    padding: 20px 22px;
+                    margin-bottom: ${isLast ? '0' : '18px'};
+                `;
+
+                // ── Header: ID + severity + score ──────────────────────
+                const header = document.createElement('div');
+                header.style.cssText = 'display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;';
+                header.innerHTML = `
+                    <span style="font-weight:700; font-size:1rem; color:#e2e8f0; letter-spacing:0.04em;">
+                        ${r.incident_id}
+                    </span>
+                    <span style="background:${col.badge}; color:#fff; font-size:0.75rem;
+                                 font-weight:700; padding:2px 10px; border-radius:20px; letter-spacing:0.06em;">
+                        ${r.risk_severity}
+                    </span>
+                    <span style="font-size:0.82rem; color:#94a3b8;">
+                        Risk score: <strong style="color:#e2e8f0;">${Math.round(r.risk_score)}/100</strong>
+                    </span>
+                    <span style="font-size:0.82rem; color:#94a3b8; margin-left:auto;">
+                        🕐 ${r.start_time.toFixed(1)}s – ${r.end_time.toFixed(1)}s
+                        &nbsp;|&nbsp; 👤 ${r.persons}
+                    </span>`;
+                wrap.appendChild(header);
+
+                // ── Summary sentence ────────────────────────────────────
+                const summaryEl = document.createElement('p');
+                summaryEl.style.cssText = 'margin:0 0 14px; font-size:0.95rem; color:#cbd5e1; line-height:1.55;';
+                summaryEl.textContent = r.summary;
+                wrap.appendChild(summaryEl);
+
+                // ── What happened (bullet points) ───────────────────────
+                const bullets = r.what_happened || [];
+                if (bullets.length) {
+                    const section = document.createElement('div');
+                    section.style.cssText = 'margin-bottom:14px;';
+                    section.innerHTML = `
+                        <div style="font-size:0.78rem; font-weight:600; color:#94a3b8;
+                                    text-transform:uppercase; letter-spacing:0.07em; margin-bottom:6px;">
+                            What happened
+                        </div>`;
+                    const ul = document.createElement('ul');
+                    ul.style.cssText = 'margin:0; padding-left:18px; list-style:disc;';
+                    bullets.forEach(b => {
+                        const li = document.createElement('li');
+                        li.style.cssText = 'font-size:0.88rem; color:#cbd5e1; margin-bottom:4px; line-height:1.5;';
+                        li.textContent = b;
+                        ul.appendChild(li);
+                    });
+                    section.appendChild(ul);
+                    wrap.appendChild(section);
+                }
+
+                // ── Why this risk level ─────────────────────────────────
+                if (r.risk_reason) {
+                    const reasonEl = document.createElement('div');
+                    reasonEl.style.cssText = 'margin-bottom:14px;';
+                    reasonEl.innerHTML = `
+                        <div style="font-size:0.78rem; font-weight:600; color:#94a3b8;
+                                    text-transform:uppercase; letter-spacing:0.07em; margin-bottom:4px;">
+                            Why this risk level
+                        </div>
+                        <p style="margin:0; font-size:0.88rem; color:#cbd5e1; line-height:1.5;">
+                            ${r.risk_reason}
+                        </p>`;
+                    wrap.appendChild(reasonEl);
+                }
+
+                // ── Recommended actions ─────────────────────────────────
+                const labels = r.response_action_labels || [];
+                if (labels.length) {
+                    const actSection = document.createElement('div');
+                    actSection.style.cssText = 'margin-bottom:14px;';
+                    actSection.innerHTML = `
+                        <div style="font-size:0.78rem; font-weight:600; color:#94a3b8;
+                                    text-transform:uppercase; letter-spacing:0.07em; margin-bottom:6px;">
+                            Recommended actions
+                        </div>`;
+                    const ul = document.createElement('ul');
+                    ul.style.cssText = 'margin:0; padding-left:18px; list-style:disc;';
+                    labels.forEach(a => {
+                        const li = document.createElement('li');
+                        li.style.cssText = 'font-size:0.88rem; color:#cbd5e1; margin-bottom:3px;';
+                        li.textContent = a;
+                        ul.appendChild(li);
+                    });
+                    actSection.appendChild(ul);
+                    wrap.appendChild(actSection);
+                }
+
+                // ── Evidence images ─────────────────────────────────────
+                const validEvidence = (r.evidence || []).filter(e => e.exists && e.image_url);
+                if (validEvidence.length) {
+                    const evSection = document.createElement('div');
+                    evSection.innerHTML = `
+                        <div style="font-size:0.78rem; font-weight:600; color:#94a3b8;
+                                    text-transform:uppercase; letter-spacing:0.07em; margin-bottom:8px;">
+                            Evidence frames (${validEvidence.length})
+                        </div>`;
+                    const grid = document.createElement('div');
+                    grid.style.cssText = 'display:flex; gap:12px; flex-wrap:wrap;';
+                    validEvidence.forEach(e => {
+                        const thumb = document.createElement('div');
+                        thumb.style.cssText = 'flex:0 0 auto; text-align:center;';
+                        thumb.innerHTML = `
+                            <a href="${e.image_url}" target="_blank"
+                               title="Click to open full size — ${e.event_label} at ${e.time_seconds}s">
+                                <img src="${e.image_url}" alt="${e.event_label}"
+                                     style="width:160px; height:106px; object-fit:cover;
+                                            border-radius:7px; border:2px solid rgba(255,255,255,0.12);
+                                            display:block; transition:border-color 0.2s;"
+                                     onmouseover="this.style.borderColor='${col.border}'"
+                                     onmouseout="this.style.borderColor='rgba(255,255,255,0.12)'">
+                            </a>
+                            <div style="margin-top:5px; font-size:0.72rem; color:#94a3b8; line-height:1.3;">
+                                ${e.event_label}<br>${e.time_seconds}s
+                            </div>`;
+                        grid.appendChild(thumb);
+                    });
+                    evSection.appendChild(grid);
+                    wrap.appendChild(evSection);
+                } else if ((r.evidence || []).length) {
+                    const missing = document.createElement('p');
+                    missing.style.cssText = 'margin:0; font-size:0.82rem; color:#64748b;';
+                    missing.textContent = 'Evidence frames were not found. The video may have been processed in a previous session.';
+                    wrap.appendChild(missing);
+                }
+
+                list.appendChild(wrap);
             });
         }
     </script>
