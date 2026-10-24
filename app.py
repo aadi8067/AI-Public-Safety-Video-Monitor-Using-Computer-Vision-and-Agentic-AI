@@ -21,6 +21,7 @@ from safety_event_pipeline import SafetyEventPipeline
 from safety_config import WEAPON_MAX_PERSON_AREA_RATIO
 from agentic_ai import AgenticSupervisor
 from report_agent import generate_incident_reports
+import pipeline_db
 
 # ============================================================
 # FLASK APP
@@ -1326,6 +1327,12 @@ def detect_video():
         capture_dir = os.path.join(OUTPUT_FOLDER, f"captured_frames_{timestamp}")
         os.makedirs(capture_dir, exist_ok=True)
 
+        # DB: open session row as soon as we know the file is valid
+        _db_session_id = pipeline_db.save_session_start(
+            filename=filename,
+            file_path=input_path,
+        )
+
         # ----------------------------------------------------
         # IMPORTANT:
         # Reset ByteTrack state before processing this video.
@@ -1582,6 +1589,18 @@ def detect_video():
             final_incidents, fps, capture_dir, capture_dir_name
         )
 
+        # DB: persist all results — safe, never raises
+        pipeline_db.save_pipeline_results(
+            _db_session_id,
+            fps=fps,
+            total_frames=frame_idx,
+            duration_sec=frame_idx / max(fps, 1.0),
+            output_dir=capture_dir,
+            capture_dir_name=capture_dir_name,
+            final_incidents=final_incidents,
+            incident_reports=incident_reports,
+        )
+
         # ----------------------------------------------------
         # RE-ENCODE TO H.264 FOR BROWSER PLAYBACK
         # ----------------------------------------------------
@@ -1722,6 +1741,18 @@ def detect_video():
         print(repr(e))
         print(tb)
         print("=" * 60)
+
+        # DB: mark session failed if we opened one
+        try:
+            pipeline_db.save_pipeline_results(
+                _db_session_id if "_db_session_id" in dir() else None,
+                fps=0, total_frames=0, duration_sec=0,
+                output_dir="", capture_dir_name="",
+                final_incidents=[], incident_reports=[],
+                failed=True,
+            )
+        except Exception:
+            pass
 
         frames = traceback.extract_tb(e.__traceback__)
         where = f"{os.path.basename(frames[-1].filename)}:{frames[-1].lineno} in {frames[-1].name}" if frames else None
@@ -1961,6 +1992,10 @@ class _LiveRun:
         for k in weapon_reject_stats: weapon_reject_stats[k] = 0
         live_session.begin()
         self.reader = _LatestFrameReader(camera)
+        # DB: open session row for this live camera run
+        self._db_session_id = pipeline_db.save_session_start(
+            filename=f"live_camera_{camera_index}_{self.timestamp}",
+        )
         print(f"Live camera started: index {camera_index}, evidence -> {self.capture_dir}")
 
     # ------------------------------------------------------------
@@ -2212,6 +2247,19 @@ class _LiveRun:
         incident_reports = generate_incident_reports(
             final_incidents, fps, self.capture_dir, folder
         )
+
+        # DB: persist all results — safe, never raises
+        pipeline_db.save_pipeline_results(
+            self._db_session_id,
+            fps=fps,
+            total_frames=self.frame_index,
+            duration_sec=self.frame_index / max(fps, 1.0),
+            output_dir=self.capture_dir,
+            capture_dir_name=folder,
+            final_incidents=final_incidents,
+            incident_reports=incident_reports,
+        )
+
         for incident in final_incidents:
             incident.pop("events", None)
         return _live_json_safe({
